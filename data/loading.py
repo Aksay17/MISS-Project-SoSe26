@@ -4,7 +4,7 @@
 # ============================================================
 
 import pandas as pd
-from config import DATA_FILE, SELECTED_DATASETS
+from config import DATA_FILE
 
 
 def load_raw_data():
