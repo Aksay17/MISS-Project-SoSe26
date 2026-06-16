@@ -123,7 +123,7 @@ def missforest_impute(df, max_iter=MICE_ITER):
     safe_cat_cols = [re.sub(r'[^A-Za-z0-9_]', '_', col) for col in cat_cols]
 
     mf         = MissForest(categorical=safe_cat_cols if safe_cat_cols else None, max_iter=max_iter, verbose=0)
-    df_imputed = mf.fit_transform(X=df_imputed)
+    df_imputed = mf.fit_transform(x=df_imputed)
 
     df_imputed.columns = original_cols
 
