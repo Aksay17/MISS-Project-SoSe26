@@ -6,10 +6,10 @@
 import numpy as np
 import pandas as pd
 from sklearn.impute import SimpleImputer, KNNImputer
-from sklearn.experimental import enable_iterative_imputer  
+from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.preprocessing import LabelEncoder
-from missforest import MissForest
+import miceforest
 from analysis.tests import split_columns
 from config import KNN_K, MICE_ITER, SEED
 
@@ -25,12 +25,12 @@ def mean_mode_impute(df):
     num_cols, cat_cols = split_columns(df)
 
     if num_cols:
-        mean_imputer          = SimpleImputer(strategy="mean")
-        df_imputed[num_cols]  = mean_imputer.fit_transform(df[num_cols])
+        mean_imputer         = SimpleImputer(strategy="mean")
+        df_imputed[num_cols] = mean_imputer.fit_transform(df[num_cols])
 
     if cat_cols:
-        mode_imputer          = SimpleImputer(strategy="most_frequent")
-        df_imputed[cat_cols]  = mode_imputer.fit_transform(df[cat_cols])
+        mode_imputer         = SimpleImputer(strategy="most_frequent")
+        df_imputed[cat_cols] = mode_imputer.fit_transform(df[cat_cols])
 
     return df_imputed
 
@@ -106,31 +106,24 @@ def mice_impute(df, max_iter=MICE_ITER):
 
 def missforest_impute(df, max_iter=MICE_ITER):
     """
-    MissForest imputation using the missforest package (LightGBM-based).
-    Based on: Stekhoven & Bühlmann (2012).
+    MissForest-style imputation using miceforest (MICE + Random Forest via LightGBM).
+    Uses a single dataset (num_datasets=1) to match the single-imputation
+    behaviour of the other methods.
+    Based on: van Buuren (2018) + Doove et al. (2014).
     """
-    import re
+    df_imputed = df.copy()
 
-    df_imputed           = df.copy()
-    num_cols, cat_cols   = split_columns(df)
+    kernel     = miceforest.ImputationKernel(
+        df_imputed,
+        num_datasets=1,
+        random_state=SEED
+    )
+    kernel.mice(max_iter)
 
-    df_imputed, encoders = _encode_categoricals(df_imputed, cat_cols)
-
-    # LightGBM rejects special JSON characters in column names — sanitize then restore
-    original_cols  = df_imputed.columns.tolist()
-    safe_cols      = [re.sub(r'[^A-Za-z0-9_]', '_', col) for col in original_cols]
-    df_imputed.columns = safe_cols
-
-    mf         = MissForest(max_iter=max_iter, verbose=0)
-    df_imputed = mf.fit_transform(df_imputed)
-
-    df_imputed.columns = original_cols  # restore original names
-
-    for col in num_cols:
-        df_imputed[col] = pd.to_numeric(df_imputed[col], errors="coerce")
-
-    df_imputed = _decode_categoricals(df_imputed, cat_cols, encoders)
+    # reset_index ensures consistent 0-based index for downstream alignment
+    df_imputed = kernel.complete_data(dataset=0).reset_index(drop=True)
     return df_imputed
+
 
 def run_all_imputations(mechanisms):
     """

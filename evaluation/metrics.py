@@ -5,7 +5,6 @@
 
 import numpy as np
 import pandas as pd
-from itertools import combinations
 from sklearn.metrics import f1_score, mean_squared_error
 from analysis.tests import split_columns, compute_stats, compute_pairwise_stats
 from config import ALPHA, SELECTED_DATASETS
@@ -30,7 +29,8 @@ def compute_stat_differences(imputed_stats, ground_truth_stats, stat_type, value
                 continue
 
             merge_cols = (
-                ["var1", "var2"]              if stat_type in ["pearson", "chi2"]
+                ["var1", "var2"]
+                if stat_type in ["pearson", "chi2"]
                 else ["categorical", "numerical"]
             )
 
@@ -75,7 +75,6 @@ def build_summary_df(differences):
     return pd.concat(summary, ignore_index=True) if summary else pd.DataFrame()
 
 
-
 # ── NRMSE and F1 ─────────────────────────────────────────────
 
 def compute_imputation_metrics(imputed_datasets, mechanisms, dfs_cleaned):
@@ -83,7 +82,8 @@ def compute_imputation_metrics(imputed_datasets, mechanisms, dfs_cleaned):
     Compute NRMSE (numeric columns) and F1 (categorical columns)
     by comparing imputed values to original values at missing positions.
 
-    Complete case drops rows, so we align by index before comparing.
+    Complete case drops rows — we preserve the original index from dropna()
+    and use it to align before resetting, so we only evaluate on surviving rows.
     """
     results = []
 
@@ -93,17 +93,19 @@ def compute_imputation_metrics(imputed_datasets, mechanisms, dfs_cleaned):
 
                 df_original = dfs_cleaned[name].reset_index(drop=True)
                 df_missing  = mechanisms[mech][name].reset_index(drop=True)
-                df_imputed  = df_imputed.reset_index(drop=True)
+                # do NOT reset df_imputed yet — preserve its index for alignment
 
                 if df_original.shape[0] != df_missing.shape[0]:
                     print(f"  WARNING: shape mismatch — {method_name} | {mech} | {name}")
                     continue
 
-                # complete case drops rows — align by index before comparing
+                # complete case drops rows — align using preserved index, then reset
                 if df_imputed.shape[0] != df_original.shape[0]:
                     shared_idx  = df_imputed.index.intersection(df_original.index)
                     df_original = df_original.loc[shared_idx].reset_index(drop=True)
                     df_missing  = df_missing.loc[shared_idx].reset_index(drop=True)
+                    df_imputed  = df_imputed.reset_index(drop=True)
+                else:
                     df_imputed  = df_imputed.reset_index(drop=True)
 
                 num_cols, cat_cols = split_columns(df_original)
