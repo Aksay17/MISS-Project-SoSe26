@@ -114,7 +114,7 @@ def compute_imputation_metrics(imputed_datasets, mechanisms, dfs_cleaned):
                     if col not in df_imputed.columns or col not in df_missing.columns:
                         continue
 
-                    missing_mask = df_missing[col].isna()
+                    missing_mask = df_missing[col].isna().values  # use .values to drop the index
                     if missing_mask.sum() == 0:
                         continue
 
