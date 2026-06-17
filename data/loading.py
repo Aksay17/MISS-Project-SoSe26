@@ -1,8 +1,3 @@
-# ============================================================
-# data/loading.py
-# Loads TCGA data and splits by cancer type.
-# ============================================================
-
 import pandas as pd
 from config import DATA_FILE
 

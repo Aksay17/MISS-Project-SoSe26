@@ -1,9 +1,3 @@
-# ============================================================
-# main.py
-# Runs the full MISS project pipeline end to end.
-# Change settings in config.py — don't edit here.
-# ============================================================
-
 import os
 from config import SELECTED_DATASETS, MISSING_RATES, PLOTS_DIR
 from data.loading import load_data

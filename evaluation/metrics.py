@@ -1,8 +1,3 @@
-# ============================================================
-# evaluation/metrics.py
-# All evaluation metrics: abs diff, NRMSE, F1
-# ============================================================
-
 import numpy as np
 import pandas as pd
 from sklearn.metrics import f1_score, mean_squared_error

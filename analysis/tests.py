@@ -1,8 +1,3 @@
-# ============================================================
-# statistics/tests.py
-# Statistical tests: Pearson, ANOVA, Chi-Square.
-# ============================================================
-
 import pandas as pd
 from itertools import combinations
 from scipy.stats import pearsonr, f_oneway, chi2_contingency

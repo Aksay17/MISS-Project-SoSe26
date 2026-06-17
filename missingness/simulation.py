@@ -1,8 +1,3 @@
-# ============================================================
-# missingness/simulation.py
-# Simulates MCAR, MAR, MNAR missingness on cleaned datasets.
-# ============================================================
-
 import numpy as np
 from missmecha.generator import MissMechaGenerator
 from config import SELECTED_DATASETS, SEED

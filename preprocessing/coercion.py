@@ -1,8 +1,3 @@
-# ============================================================
-# preprocessing/coercion.py
-# Fixes misclassified column types after cleaning.
-# ============================================================
-
 import pandas as pd
 from config import SELECTED_DATASETS
 

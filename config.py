@@ -1,8 +1,3 @@
-# ============================================================
-# config.py
-# All project-wide settings in one place.
-# Change values here to re-run with different parameters.
-# ============================================================
 DATA_FILE = r"C:\Users\PC\Documents\GitHub\MISS-Project-SoSe26\data\data_file\cBioportal_data.tsv"
 # Dataset
 SELECTED_DATASETS = [

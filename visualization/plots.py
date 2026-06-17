@@ -1,10 +1,3 @@
-# ============================================================
-# visualization/plots.py
-# All plotting functions.
-# Each function accepts a save_path argument; pass a filepath
-# to save to disk instead of displaying interactively.
-# ============================================================
-
 import os
 import numpy as np
 import pandas as pd
