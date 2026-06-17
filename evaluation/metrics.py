@@ -84,6 +84,7 @@ def compute_imputation_metrics(imputed_datasets, mechanisms, dfs_cleaned):
 
     Complete case drops rows — we preserve the original index from dropna()
     and use it to align before resetting, so we only evaluate on surviving rows.
+    All indexing uses numpy arrays to avoid pandas index misalignment issues.
     """
     results = []
 
@@ -114,22 +115,29 @@ def compute_imputation_metrics(imputed_datasets, mechanisms, dfs_cleaned):
                     if col not in df_imputed.columns or col not in df_missing.columns:
                         continue
 
-                    missing_mask = df_missing[col].isna().values  # use .values to drop the index
+                    # use numpy arrays throughout to avoid all index alignment issues
+                    missing_mask = df_missing[col].isna().to_numpy()
                     if missing_mask.sum() == 0:
                         continue
 
-                    orig    = df_original.loc[missing_mask, col]
-                    imputed = df_imputed.loc[missing_mask, col]
+                    orig    = df_original[col].to_numpy()
+                    imputed = df_imputed[col].to_numpy()
+
+                    orig_at_missing    = orig[missing_mask]
+                    imputed_at_missing = imputed[missing_mask]
 
                     if col in num_cols:
-                        orig_vals    = pd.to_numeric(orig,    errors="coerce").dropna()
-                        imputed_vals = pd.to_numeric(imputed, errors="coerce").loc[orig_vals.index]
+                        orig_vals    = pd.to_numeric(pd.Series(orig_at_missing),    errors="coerce")
+                        imputed_vals = pd.to_numeric(pd.Series(imputed_at_missing), errors="coerce")
+                        valid        = orig_vals.notna()
+                        orig_vals    = orig_vals[valid]
+                        imputed_vals = imputed_vals[valid]
 
                         if len(orig_vals) < 2:
                             continue
 
                         rmse    = np.sqrt(mean_squared_error(orig_vals, imputed_vals))
-                        col_std = df_original[col].std()
+                        col_std = pd.Series(orig).std()
                         nrmse   = rmse / col_std if col_std > 0 else np.nan
 
                         if pd.isna(nrmse):
@@ -139,8 +147,8 @@ def compute_imputation_metrics(imputed_datasets, mechanisms, dfs_cleaned):
                                         "column": col, "type": "numeric", "metric": "NRMSE", "value": nrmse})
 
                     elif col in cat_cols:
-                        orig_vals    = orig.astype(str)
-                        imputed_vals = imputed.astype(str)
+                        orig_vals    = pd.Series(orig_at_missing).astype(str)
+                        imputed_vals = pd.Series(imputed_at_missing).astype(str)
 
                         valid_mask   = orig_vals != "nan"
                         orig_vals    = orig_vals[valid_mask]
