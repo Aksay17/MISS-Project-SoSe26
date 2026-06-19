@@ -77,9 +77,9 @@ def compute_imputation_metrics(imputed_datasets, mechanisms, dfs_cleaned):
     Compute NRMSE (numeric columns) and F1 (categorical columns)
     by comparing imputed values to original values at missing positions.
 
-    Complete case drops rows — we preserve the original index from dropna()
-    and use it to align before resetting, so we only evaluate on surviving rows.
-    All indexing uses numpy arrays to avoid pandas index misalignment issues.
+    Complete case drops rows — we align on shared index labels before resetting,
+    so we only evaluate on rows that survived. All three frames are reset together
+    so positional (numpy) indexing is safe throughout.
     """
     results = []
 
@@ -87,17 +87,26 @@ def compute_imputation_metrics(imputed_datasets, mechanisms, dfs_cleaned):
         for mech, datasets in mech_datasets.items():
             for name, df_imputed in datasets.items():
 
+                # Reset df_original and df_missing to RangeIndex(0, N) first.
+                # This gives them a clean, predictable label space before we
+                # use df_imputed.index to select the surviving rows.
+                # Missmecha and sklearn imputers may return different index types;
+                # resetting here decouples us from whatever they produce.
                 df_original = dfs_cleaned[name].reset_index(drop=True)
                 df_missing  = mechanisms[mech][name].reset_index(drop=True)
-                # do NOT reset df_imputed yet — preserve its index for alignment
 
                 if df_original.shape[0] != df_missing.shape[0]:
                     print(f"  WARNING: shape mismatch — {method_name} | {mech} | {name}")
                     continue
 
-                # complete case drops rows — align using preserved index, then reset
+                # For complete_case, df_imputed has fewer rows and its index labels
+                # are a subset of the original (pre-reset) row positions.
+                # KNN/MICE/MissForest return N rows with a fresh RangeIndex from
+                # the sklearn pd.DataFrame constructor, so their index == 0..N-1.
+                # In both cases, df_imputed.index labels are valid row labels in
+                # the reset df_original / df_missing (which are now 0..N-1).
                 if df_imputed.shape[0] != df_original.shape[0]:
-                    shared_idx  = df_imputed.index.intersection(df_original.index)
+                    shared_idx  = df_imputed.index
                     df_original = df_original.loc[shared_idx].reset_index(drop=True)
                     df_missing  = df_missing.loc[shared_idx].reset_index(drop=True)
                     df_imputed  = df_imputed.reset_index(drop=True)
@@ -122,8 +131,8 @@ def compute_imputation_metrics(imputed_datasets, mechanisms, dfs_cleaned):
                     imputed_at_missing = imputed[missing_mask]
 
                     if col in num_cols:
-                        orig_vals    = pd.to_numeric(pd.Series(orig_at_missing),    errors="coerce")
-                        imputed_vals = pd.to_numeric(pd.Series(imputed_at_missing), errors="coerce")
+                        orig_vals    = pd.to_numeric(pd.Series(orig_at_missing),    errors="coerce").reset_index(drop=True)
+                        imputed_vals = pd.to_numeric(pd.Series(imputed_at_missing), errors="coerce").reset_index(drop=True)
                         valid        = orig_vals.notna()
                         orig_vals    = orig_vals[valid]
                         imputed_vals = imputed_vals[valid]
