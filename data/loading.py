@@ -1,10 +1,11 @@
+
 import pandas as pd
-from config import DATA_FILE
+from config import DATA_URL, SELECTED_DATASETS
 
 
 def load_raw_data():
     """Load raw TCGA clinical data from GitHub."""
-    df = pd.read_csv(DATA_FILE, sep="\t", low_memory=False)
+    df = pd.read_csv(DATA_URL, sep="\t", low_memory=False)
     print(f"Loaded TCGA data: {df.shape[0]} rows, {df.shape[1]} columns")
     return df
 

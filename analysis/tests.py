@@ -3,14 +3,16 @@ from itertools import combinations
 from scipy.stats import pearsonr, f_oneway, chi2_contingency
 from config import MIN_GROUP_SIZE, MAX_CARDINALITY
 
-#Split dataframe columns into numeric and categorical.
+
 def split_columns(df):
+    """Split dataframe columns into numeric and categorical."""
     num_cols = df.select_dtypes(include="number").columns.tolist()
     cat_cols = df.select_dtypes(include="object").columns.tolist()
     return num_cols, cat_cols
 
-#Pearson correlation for all numeric column pairs
+
 def run_pearson(df, num_cols):
+    """Pearson correlation for all numeric column pairs."""
     results = []
     for col1, col2 in combinations(num_cols, 2):
         try:
@@ -23,8 +25,9 @@ def run_pearson(df, num_cols):
             continue
     return pd.DataFrame(results)
 
-#One-way ANOVA for all numeric-categorical column pairs.
+
 def run_anova(df, num_cols, cat_cols):
+    """One-way ANOVA for all numeric-categorical column pairs."""
     results = []
     for cat in cat_cols:
         if df[cat].nunique() < 2 or df[cat].nunique() > MAX_CARDINALITY:

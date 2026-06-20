@@ -1,5 +1,6 @@
-DATA_FILE = r"C:\Users\PC\Documents\GitHub\MISS-Project-SoSe26\data\data_file\cBioportal_data.tsv"
 # Dataset
+DATA_URL = r"C:\Users\PC\Documents\GitHub\miss_project\data\data_file\cBioportal_data.tsv"
+
 SELECTED_DATASETS = [
     "Invasive Breast Carcinoma",
     "Non-Small Cell Lung Cancer",
@@ -11,7 +12,7 @@ SELECTED_DATASETS = [
 TARGET_ROW_RETENTION = 0.2
 
 # Missingness simulation
-MISSING_RATES = [0.1, 0.2, 0.3]   # add/remove rates here to test more
+MISSING_RATES = [0.1 , 0.2, 0.3]   # add/remove rates here to test more
 SEED          = 42
 
 # Imputation

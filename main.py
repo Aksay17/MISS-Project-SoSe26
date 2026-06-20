@@ -1,25 +1,31 @@
+# ============================================================
+# main.py
+# Runs the full MISS project pipeline end to end.
+# Change settings in config.py — don't edit here.
+# ============================================================
+
+import pickle
 import os
-from config import SELECTED_DATASETS, MISSING_RATES, PLOTS_DIR
+import pandas as pd
+
+from config import SELECTED_DATASETS, MISSING_RATES, RESULTS_DIR
 from data.loading import load_data
 from preprocessing.cleaning import clean_datasets
 from preprocessing.coercion import coerce_types
 from missingness.simulation import simulate_all
-from imputation.methods import run_all_imputations
-from analysis.tests import compute_stats, compute_pairwise_stats
+from imputation.methods import run_all_imputations, impute_complete_case
+from analysis.tests import compute_stats, compute_pairwise_stats, split_columns
 from evaluation.metrics import (
     compute_all_differences,
-    build_summary_df,
-    compute_imputation_metrics
+    build_summary_df
 )
 from visualization.plots import (
     plot_heatmap,
     plot_rank,
-    plot_metrics,
-    plot_degradation_line,
-    plot_degradation_aggregated,
+    plot_degradation_line
 )
 
-os.makedirs(PLOTS_DIR, exist_ok=True)
+os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
 def run_pipeline_for_rate(dfs_cleaned, missing_rate):
@@ -28,9 +34,13 @@ def run_pipeline_for_rate(dfs_cleaned, missing_rate):
     print(f"Running pipeline for missing_rate = {missing_rate}")
     print(f"{'='*60}")
 
-    mechanisms       = simulate_all(dfs_cleaned, missing_rate)
+    # simulate missingness
+    mechanisms = simulate_all(dfs_cleaned, missing_rate)
+
+    # impute
     imputed_datasets = run_all_imputations(mechanisms)
 
+    # compute stats on imputed datasets
     all_stats = {}
     for method_name, mech_datasets in imputed_datasets.items():
         all_stats[method_name] = {}
@@ -40,6 +50,7 @@ def run_pipeline_for_rate(dfs_cleaned, missing_rate):
                 all_stats[method_name][mech][name] = compute_stats(df)
                 print(f"  stats: {method_name} | {mech} | {name}")
 
+    # pairwise stats (no imputation — run on missing datasets directly)
     all_stats["pairwise"] = {}
     for mech, datasets in mechanisms.items():
         all_stats["pairwise"][mech] = {}
@@ -51,7 +62,7 @@ def run_pipeline_for_rate(dfs_cleaned, missing_rate):
 
 def main():
 
-    # ── 1. Load and clean ────────────────────────────────────
+    # ── 1. Load and clean data ───────────────────────────────
     print("\n[1] Loading and cleaning data...")
     dfs         = load_data()
     dfs_cleaned = clean_datasets(dfs)
@@ -78,35 +89,36 @@ def main():
             "all_stats":        all_stats
         }
 
-    # ── 4. Evaluation ────────────────────────────────────────
+    # save to disk so you don't have to rerun
+    with open(f"{RESULTS_DIR}/all_rates_results.pkl", "wb") as f:
+        pickle.dump(all_rates_results, f)
+    print(f"\nResults saved to {RESULTS_DIR}/all_rates_results.pkl")
+
+    # ── 4. Evaluation for primary rate (0.1) ─────────────────
     print("\n[4] Running evaluation for primary rate (0.1)...")
     primary          = all_rates_results[0.1]
     mechanisms       = primary["mechanisms"]
     imputed_datasets = primary["imputed_datasets"]
     all_stats        = primary["all_stats"]
 
+    # differences
     differences = compute_all_differences(all_stats, ground_truth_stats)
     summary_df  = build_summary_df(differences)
-    metrics_df  = compute_imputation_metrics(imputed_datasets, mechanisms, dfs_cleaned)
 
+    # ── 5. Plots ─────────────────────────────────────────────
+    print("\n[7] Generating plots...")
+    
+    for stat_type, value_col in [("pearson", "correlation"), ("anova", "f_stat"), ("chi2", "chi2")]:
+        plot_heatmap(stat_type, value_col, summary_df)
+        plot_rank(stat_type, differences)
+
+    # degradation line plots (uses all rates)
     all_rates_stats = {
         rate: result["all_stats"]
         for rate, result in all_rates_results.items()
     }
-
-    # ── 5. Save plots ─────────────────────────────────────────
-    print(f"\n[5] Saving plots to {PLOTS_DIR}/...")
-
-    for stat_type, value_col in [("pearson", "correlation"), ("anova", "f_stat"), ("chi2", "chi2")]:
-        plot_heatmap(stat_type, value_col, summary_df,            save_dir=PLOTS_DIR)
-        plot_rank(stat_type, differences,                         save_dir=PLOTS_DIR)
-        plot_degradation_line(stat_type, all_rates_stats,
-                              ground_truth_stats,                 save_dir=PLOTS_DIR)
-        plot_degradation_aggregated(stat_type, all_rates_stats,
-                                    ground_truth_stats,           save_dir=PLOTS_DIR)
-
-    plot_metrics("NRMSE", metrics_df, save_dir=PLOTS_DIR)
-    plot_metrics("F1",    metrics_df, save_dir=PLOTS_DIR)
+    for stat_type in ["pearson", "anova", "chi2"]:
+        plot_degradation_line(stat_type, all_rates_stats, ground_truth_stats)
 
     print("\nDone.")
 

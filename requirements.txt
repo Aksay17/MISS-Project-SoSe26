@@ -4,4 +4,5 @@ scipy
 scikit-learn
 matplotlib
 seaborn
-missmecha-py
+scikit-posthocs
+missmecha

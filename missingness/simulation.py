@@ -1,6 +1,28 @@
+# ============================================================
+# missingness/simulation.py
+# Simulates MCAR, MAR, MNAR missingness on cleaned datasets.
+# ============================================================
+
 import numpy as np
 from missmecha.generator import MissMechaGenerator
 from config import SELECTED_DATASETS, SEED
+
+
+def restore_dtypes(df_missing, df_original):
+    """
+    Restore original dtypes after MissMechaGenerator converts everything to float.
+    Starts from original dataframe and only punches in NaN positions from simulation.
+    """
+    df_fixed = df_original.copy()
+
+    for col in df_original.columns:
+        if col not in df_missing.columns:
+            continue
+        missing_mask = df_missing[col].isna()
+        df_fixed.loc[missing_mask, col] = np.nan
+
+    return df_fixed
+
 
 def simulate_mcar(dfs_cleaned, missing_rate, seed=SEED):
     """Simulate Missing Completely At Random."""

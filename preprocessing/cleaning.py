@@ -1,3 +1,8 @@
+# ============================================================
+# preprocessing/cleaning.py
+# Cleans each cancer type sub-dataframe.
+# ============================================================
+
 import pandas as pd
 from config import TARGET_ROW_RETENTION, SELECTED_DATASETS
 
