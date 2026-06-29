@@ -5,19 +5,11 @@
 
 import numpy as np
 import pandas as pd
-from itertools import combinations
-from sklearn.metrics import f1_score, mean_squared_error
-from analysis.tests import split_columns, compute_stats, compute_pairwise_stats
-#from config import ALPHA, SELECTED_DATASETS
 
-
-# ── Stat differences ─────────────────────────────────────────
-
+#  Compute absolute difference between imputed and ground truth statistics
+#  for every variable pair, mechanism and dataset.
 def compute_stat_differences(imputed_stats, ground_truth_stats, stat_type, value_col):
-    """
-    Compute absolute difference between imputed and ground truth statistics
-    for every variable pair, mechanism and dataset.
-    """
+    
     results = []
 
     merge_cols = (
@@ -47,7 +39,7 @@ def compute_stat_differences(imputed_stats, ground_truth_stats, stat_type, value
                     {"abs_diff": [np.nan], "mechanism": [mech], "dataset": [name]}
                 ))
                 continue
-
+            #difference between imputed and ground truth values, absolute value
             merged["abs_diff"]  = (merged[f"{value_col}_imputed"] - merged[f"{value_col}_gt"]).abs()
             merged["mechanism"] = mech
             merged["dataset"]   = name
@@ -56,9 +48,8 @@ def compute_stat_differences(imputed_stats, ground_truth_stats, stat_type, value
 
     return pd.concat(results, ignore_index=True) if results else pd.DataFrame()
 
-
+#Compute differences for all methods and stat types.
 def compute_all_differences(all_stats, ground_truth_stats):
-    """Compute differences for all methods and stat types."""
     differences = {}
     for method_name, stats_dict in all_stats.items():
         differences[method_name] = {
@@ -69,9 +60,8 @@ def compute_all_differences(all_stats, ground_truth_stats):
         print(f"  {method_name} differences computed")
     return differences
 
-
+#Aggregate pair-level differences into mean per method/mechanism/dataset.
 def build_summary_df(differences):
-    """Aggregate pair-level differences into mean per method/mechanism/dataset."""
     summary = []
     for method_name, stat_diffs in differences.items():
         for stat_type, df in stat_diffs.items():

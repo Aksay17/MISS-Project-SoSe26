@@ -1,20 +1,14 @@
-# ============================================================
-# visualization/plots.py
-# All plotting functions.
-# ============================================================
-
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from config import ALPHA, PLOTS_DIR
+from config import PLOTS_DIR
+from evaluation.metrics import compute_stat_differences
 
 
-# ── Heatmaps ─────────────────────────────────────────────────
-
+#Mean absolute difference heatmap — rows=datasets, cols=methods.
 def plot_heatmap(stat_type, value_col, summary_df):
-    """Mean absolute difference heatmap — rows=datasets, cols=methods."""
     df = summary_df[summary_df["stat_type"] == stat_type].copy()
 
     if df.empty:
@@ -53,10 +47,10 @@ def plot_heatmap(stat_type, value_col, summary_df):
                     dpi=150, bbox_inches="tight")
         plt.show()
 
-# ── Rank plot ────────────────────────────────────────────────
-
+# Average rank plot; lower rank = better method.
+# based on mean absolute difference across all datasets and mechanisms.
+# 'forgets' about the actual values and just ranks the methods by performance.
 def plot_rank(stat_type, differences):
-    """Average rank plot — lower rank = better method."""
     all_data = []
     for method_name, stat_diffs in differences.items():
         df = stat_diffs[stat_type]
@@ -80,7 +74,7 @@ def plot_rank(stat_type, differences):
     mech_rank = grouped.groupby(["mechanism", "method"])["rank"].mean().reset_index()
 
     fig, axes = plt.subplots(1, 4, figsize=(28, 8))
-    colors    = {"MCAR": "#55A868", "MAR": "#DD8452", "MNAR": "#C44E52"}
+    colors    = {"MCAR":"#55A868", "MAR": "#DD8452", "MNAR": "#C44E52"}
 
     # overall
     ax   = axes[0]
@@ -121,26 +115,13 @@ def plot_rank(stat_type, differences):
     plt.show()
 
 
-# ── Line plot for missingness rate degradation ───────────────
-
+# Line plot for missingness rate degradation 
+# Line plot showing performance degradation across missingness rates.
+# imputation method preserved statistics, at each missingness rate.
+# x = missing rate, y = mean absolute difference, one line per method.
 def plot_degradation_line(stat_type, all_rates_stats, ground_truth_stats,
                           min_coverage=30):
-    """
-    Line plot showing performance degradation across missingness rates.
-    x = missing rate, y = mean absolute difference, one line per method.
-
-    Coverage guard
-    --------------
-    Each plotted point is the mean of N per-pair differences. Under heavy
-    missingness, complete-case deletion can leave so few rows that only a
-    handful of tests survive (and on different datasets at each rate), making
-    the point unstable and not comparable across x. Any point backed by fewer
-    than `min_coverage` valid tests is set to NaN so it drops out of the line
-    instead of being plotted as a misleading value. Set min_coverage=0 to
-    disable the guard.
-    """
-    from evaluation.metrics import compute_stat_differences
-
+  
     value_col = (
         "correlation" if stat_type == "pearson" else
         "f_stat"      if stat_type == "anova"   else

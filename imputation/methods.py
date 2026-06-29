@@ -10,18 +10,15 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
-from sklearn.linear_model import LogisticRegression
 from analysis.tests import split_columns
 from config import KNN_K, MICE_ITER, RF_TREES, SEED
 
-
+#Remove all rows with any missing values.
 def impute_complete_case(df):
-    """Remove all rows with any missing values."""
     return df.dropna()
 
-
+#Mean imputation for numeric, mode imputation for categorical.
 def mean_mode_impute(df):
-    """Mean imputation for numeric, mode imputation for categorical."""
     df_imputed         = df.copy()
     num_cols, cat_cols = split_columns(df)
 
@@ -35,34 +32,36 @@ def mean_mode_impute(df):
 
     return df_imputed
 
-
+#Encode categorical columns as integers for imputation.
 def _encode_categoricals(df_imputed, cat_cols):
-    """Encode categorical columns as integers for imputation."""
     encoders = {}
     for col in cat_cols:
-        le       = LabelEncoder()
+        le       = LabelEncoder() # LabelEncoder learns the mapping from category labels to integers
         non_null = df_imputed[col].dropna()
         le.fit(non_null)
+        # so the same mapping can be reversed later 
         encoders[col]       = le
         df_imputed[col]     = df_imputed[col].map(
-            lambda x: le.transform([x])[0] if pd.notna(x) else np.nan
+            lambda x: le.transform([x])[0] if pd.notna(x) else np.nan #Rewrites the column: each real label becomes its integer code, and each NaN stays NaN
         )
     return df_imputed, encoders
 
-
+#Decode categorical columns back to original string labels.
 def _decode_categoricals(df_imputed, cat_cols, encoders):
-    """Decode categorical columns back to original string labels."""
     for col, le in encoders.items():
         if col not in df_imputed.columns:
             continue
+        #if any NaN somehow survived imputation,
+        #fill it with the column's most common value (mode()[0]) so the next steps don't choke on NaN.
         df_imputed[col] = df_imputed[col].fillna(df_imputed[col].mode()[0])
+        # The imputed floats get snapped back to valid category codes
         df_imputed[col] = df_imputed[col].round().clip(0, len(le.classes_) - 1).astype(int)
+        #saved encoder reverses the mapping: integers go back to their original string labels
         df_imputed[col] = le.inverse_transform(df_imputed[col])
     return df_imputed
 
-
+#KNN imputation — finds K nearest neighbours and fills missing values.
 def knn_impute(df, k=KNN_K):
-    """KNN imputation — finds K nearest neighbours and fills missing values."""
     df_imputed         = df.copy()
     num_cols, cat_cols = split_columns(df)
 
@@ -81,13 +80,9 @@ def knn_impute(df, k=KNN_K):
     df_imputed = _decode_categoricals(df_imputed, cat_cols, encoders)
     return df_imputed
 
-
+#Single-imputation MICE variant using sklearn IterativeImputer
+# with BayesianRidge (default estimator).
 def mice_impute(df, max_iter=MICE_ITER):
-    """
-    Single-imputation MICE variant using sklearn IterativeImputer
-    with BayesianRidge (default estimator).
-    Based on: van Buuren & Groothuis-Oudshoorn (2011).
-    """
     df_imputed         = df.copy()
     num_cols, cat_cols = split_columns(df)
 
@@ -105,12 +100,8 @@ def mice_impute(df, max_iter=MICE_ITER):
     df_imputed = _decode_categoricals(df_imputed, cat_cols, encoders)
     return df_imputed
 
-
+# MissForest imputation using IterativeImputer with RandomForestRegressor.
 def missforest_impute(df, n_estimators=RF_TREES, max_iter=MICE_ITER):
-    """
-    MissForest imputation using IterativeImputer with RandomForestRegressor.
-    Based on: Stekhoven & Bühlmann (2012).
-    """
     df_imputed         = df.copy()
     num_cols, cat_cols = split_columns(df)
 
@@ -132,12 +123,10 @@ def missforest_impute(df, n_estimators=RF_TREES, max_iter=MICE_ITER):
     df_imputed = _decode_categoricals(df_imputed, cat_cols, encoders)
     return df_imputed
 
-
+#Run all imputation methods on all mechanism datasets.
+#Returns nested dict: imputed_datasets[method][mech][name]
 def run_all_imputations(mechanisms):
-    """
-    Run all imputation methods on all mechanism datasets.
-    Returns nested dict: imputed_datasets[method][mech][name]
-    """
+    
     imputation_fns = {
         "complete_case": impute_complete_case, 
         "mean_mode":  mean_mode_impute,
@@ -154,6 +143,6 @@ def run_all_imputations(mechanisms):
             imputed_datasets[method_name][mech] = {}
             for name, df in datasets.items():
                 imputed_datasets[method_name][mech][name] = impute_fn(df)
-                print(f"  {method_name} | {mech} | {name} done")
+                print(f"  {method_name} | {mech} | {name} - successfully imputed")
 
     return imputed_datasets

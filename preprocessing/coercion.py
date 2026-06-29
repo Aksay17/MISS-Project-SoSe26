@@ -1,17 +1,8 @@
-# ============================================================
-# preprocessing/coercion.py
-# Fixes misclassified column types after cleaning.
-# ============================================================
-
 import pandas as pd
 from config import SELECTED_DATASETS
 
-
+# Detect object columns that are actually numeric (stored as strings but contain numbers).
 def detect_suspected_numeric(dfs_cleaned):
-    """
-    Detect object columns that are actually numeric
-    (stored as strings but contain numbers).
-    """
     suspected_numeric = {}
     for name in SELECTED_DATASETS:
         if name not in dfs_cleaned:
@@ -19,41 +10,41 @@ def detect_suspected_numeric(dfs_cleaned):
         df   = dfs_cleaned[name]
         cols = []
         for col in df.select_dtypes(include="object").columns:
+            #The key test: try to turn the column into numbers. 
+            #errors="coerce" means anything that won't parse as a number becomes NaN
             converted = pd.to_numeric(df[col], errors="coerce")
+            #gives the fraction that succeeded. If more than 80% parsed, it's treated as a number column 
             if converted.notna().sum() / len(df) > 0.8:
                 cols.append(col)
         suspected_numeric[name] = cols
     return suspected_numeric
 
-
+# Detect numeric columns that are actually categorical (stored as ints but represent categories like 0/1 flags).
 def detect_suspected_categorical(dfs_cleaned):
-    """
-    Detect numeric columns that are actually categorical
-    (stored as ints but represent categories like 0/1 flags).
-    """
     suspected_categorical = {}
     for name in SELECTED_DATASETS:
         if name not in dfs_cleaned:
             continue
         df   = dfs_cleaned[name]
         cols = []
+        #narrows to only the numeric columns 
+        #the only ones that could be misclassified.
         for col in df.select_dtypes(include="number").columns:
+        #Flag this numeric column as secretly-categorical if it has 10 
+        #or fewer distinct values and every value is a whole number (no decimals)    
             if df[col].nunique() <= 10 and df[col].dropna().apply(float.is_integer).all():
                 cols.append(col)
         suspected_categorical[name] = cols
     return suspected_categorical
 
-
+#Apply type coercions:
+#Convert suspected categorical columns to string
+#Convert suspected numeric columns to float, drop if NaNs introduced
 def coerce_types(dfs_cleaned):
-    """
-    Apply type coercions:
-    - Convert suspected categorical columns to string
-    - Convert suspected numeric columns to float, drop if NaNs introduced
-    """
     suspected_numeric     = detect_suspected_numeric(dfs_cleaned)
     suspected_categorical = detect_suspected_categorical(dfs_cleaned)
 
-    # convert suspected categorical → string
+    # convert suspected categorical into string
     for name in SELECTED_DATASETS:
         if name not in dfs_cleaned:
             continue
@@ -62,7 +53,7 @@ def coerce_types(dfs_cleaned):
             sub_df[col] = sub_df[col].astype(str)
         dfs_cleaned[name] = sub_df
 
-    # convert suspected numeric → float, drop column if NaNs introduced
+    # convert suspected numeric into float, drop column if NaNs introduced
     for name in SELECTED_DATASETS:
         if name not in dfs_cleaned:
             continue
@@ -79,5 +70,5 @@ def coerce_types(dfs_cleaned):
     for name, df in dfs_cleaned.items():
         assert df.isna().sum().sum() == 0, f"{name} has NaNs after type coercion"
 
-    print("Type coercion complete — all datasets have 0 NaNs")
+    print("Type coercion complete. All datasets have 0 NaNs")
     return dfs_cleaned
