@@ -1,3 +1,9 @@
+# ============================================================
+# main.py
+# Runs the full MISS project pipeline end to end.
+# Change settings in config.py — don't edit here.
+# ============================================================
+
 import pickle
 import os
 import pandas as pd
@@ -11,19 +17,21 @@ from imputation.methods import run_all_imputations, impute_complete_case
 from analysis.tests import compute_stats, compute_pairwise_stats, split_columns
 from evaluation.metrics import (
     compute_all_differences,
-    build_summary_df
+    build_summary_df,
+    compute_recovery_accuracy
 )
 from visualization.plots import (
     plot_heatmap,
     plot_rank,
-    plot_degradation_line
+    plot_degradation_line,
+    plot_recovery_bar
 )
 
-os.makedirs(RESULTS_DIR, exist_ok=True) ##don't error if it's already there
+os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
-#Run full simulation + imputation + stats pipeline for one missing rate.
 def run_pipeline_for_rate(dfs_cleaned, missing_rate):
+    """Run full simulation + imputation + stats pipeline for one missing rate."""
     print(f"\n{'='*60}")
     print(f"Running pipeline for missing_rate = {missing_rate}")
     print(f"{'='*60}")
@@ -56,14 +64,14 @@ def run_pipeline_for_rate(dfs_cleaned, missing_rate):
 
 def main():
 
-    # Load and clean data 
-    print("\nStep 1: Loading and cleaning data...")
+    # ── 1. Load and clean data ───────────────────────────────
+    print("\n[1] Loading and cleaning data...")
     dfs         = load_data()
     dfs_cleaned = clean_datasets(dfs)
     dfs_cleaned = coerce_types(dfs_cleaned)
 
-    # Ground truth stats 
-    print("\nStep 2: Computing ground truth statistics...")
+    # ── 2. Ground truth stats ────────────────────────────────
+    print("\n[2] Computing ground truth statistics...")
     ground_truth_stats = {}
     for name in SELECTED_DATASETS:
         if name not in dfs_cleaned:
@@ -71,8 +79,8 @@ def main():
         ground_truth_stats[name] = compute_stats(dfs_cleaned[name])
         print(f"  {name} done")
 
-    # Run pipeline for all missing rates
-    print("\nStep 3: Running pipeline for all missing rates...")
+    # ── 3. Run pipeline for all missing rates ────────────────
+    print("\n[3] Running pipeline for all missing rates...")
     all_rates_results = {}
 
     for rate in MISSING_RATES:
@@ -83,13 +91,13 @@ def main():
             "all_stats":        all_stats
         }
 
-    # save to disk 
+    # save to disk so you don't have to rerun
     with open(f"{RESULTS_DIR}/all_rates_results.pkl", "wb") as f:
         pickle.dump(all_rates_results, f)
     print(f"\nResults saved to {RESULTS_DIR}/all_rates_results.pkl")
 
-    # Evaluation for primary rate (0.1) 
-    print("\nStep 4: Running evaluation for primary rate (0.1)...")
+    # ── 4. Evaluation for primary rate (0.1) ─────────────────
+    print("\n[4] Running evaluation for primary rate (0.1)...")
     primary          = all_rates_results[0.1]
     mechanisms       = primary["mechanisms"]
     imputed_datasets = primary["imputed_datasets"]
@@ -99,20 +107,30 @@ def main():
     differences = compute_all_differences(all_stats, ground_truth_stats)
     summary_df  = build_summary_df(differences)
 
-    # Plots
-    print("\nStep 5: Generating plots...")
-    
-    for stat_type, value_col in [("pearson", "correlation"), ("anova", "f_stat"), ("chi2", "chi2")]:
-        plot_heatmap(stat_type, value_col, summary_df)
-        plot_rank(stat_type, differences)
+    # ── 5. Plots ─────────────────────────────────────────────
+    print("\n[7] Generating plots...")
 
-    # degradation line plots (uses all rates)
+    # all_rates_stats spans every missing rate — used by the aggregated rank
+    # plot and the degradation line plots.
     all_rates_stats = {
         rate: result["all_stats"]
         for rate, result in all_rates_results.items()
     }
+
+    for stat_type, value_col in [("pearson", "correlation"), ("anova", "f_stat"), ("chi2", "chi2")]:
+        plot_heatmap(stat_type, value_col, summary_df)
+        plot_rank(stat_type, all_rates_stats, ground_truth_stats)
+
+    # degradation line plots (uses all rates)
     for stat_type in ["pearson", "anova", "chi2"]:
         plot_degradation_line(stat_type, all_rates_stats, ground_truth_stats)
+
+    # cell-level imputation recovery plots
+    accuracy_df = compute_recovery_accuracy(all_rates_results, dfs_cleaned)
+
+    # Recovery: grouped bar by rate, one panel per mechanism (bar only)
+    plot_recovery_bar(accuracy_df, "nrmse")
+    plot_recovery_bar(accuracy_df, "cat_accuracy")
 
     print("\nDone.")
 

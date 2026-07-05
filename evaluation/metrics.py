@@ -72,3 +72,71 @@ def build_summary_df(differences):
             grouped["stat_type"] = stat_type
             summary.append(grouped)
     return pd.concat(summary, ignore_index=True) if summary else pd.DataFrame()
+
+
+# Cell-level imputation accuracy at the masked (originally-missing) positions.
+# Numeric  -> NRMSE (RMSE normalised by ground-truth range), lower = better.
+# Categorical -> proportion of masked cells recovered exactly, higher = better.
+# Only value-filling methods are scored (mean_mode, knn, mice, missforest);
+# complete_case deletes rows and pairwise never imputes, so both are skipped.
+def compute_recovery_accuracy(all_rates_results, dfs_cleaned):
+    from analysis.tests import split_columns
+
+    SKIP = {"complete_case"}   # does not impute cell values
+    rows = []
+
+    for rate, result in all_rates_results.items():
+        mechanisms       = result["mechanisms"]
+        imputed_datasets = result["imputed_datasets"]
+
+        for method, mech_data in imputed_datasets.items():
+            if method in SKIP:
+                continue
+            for mech, datasets in mech_data.items():
+                for name, imp in datasets.items():
+                    if name not in dfs_cleaned:
+                        continue
+
+                    # Imputers rebuild the frame with a fresh index, so align by
+                    # ROW POSITION (reset_index), never by index label.
+                    truth   = dfs_cleaned[name].reset_index(drop=True)
+                    missing = mechanisms[mech][name].reset_index(drop=True)
+                    imputed = imp.reset_index(drop=True)
+                    num_cols, cat_cols = split_columns(truth)
+
+                    # ---- numeric: NRMSE per column, then average ----
+                    nrmse_vals = []
+                    for col in num_cols:
+                        if col not in imputed.columns:
+                            continue
+                        mask = missing[col].isna()
+                        if mask.sum() == 0:
+                            continue
+                        true_v = pd.to_numeric(truth.loc[mask, col],   errors="coerce").to_numpy(float)
+                        pred_v = pd.to_numeric(imputed.loc[mask, col], errors="coerce").to_numpy(float)
+                        col_range = truth[col].max() - truth[col].min()
+                        denom = col_range if (col_range and not np.isnan(col_range)) else truth[col].std()
+                        if not denom or np.isnan(denom):
+                            continue
+                        rmse = np.sqrt(np.nanmean((pred_v - true_v) ** 2))
+                        nrmse_vals.append(rmse / denom)
+
+                    # ---- categorical: accuracy per column, then average ----
+                    acc_vals = []
+                    for col in cat_cols:
+                        if col not in imputed.columns:
+                            continue
+                        mask = missing[col].isna()
+                        if mask.sum() == 0:
+                            continue
+                        t = truth.loc[mask, col].astype(str).to_numpy()
+                        p = imputed.loc[mask, col].astype(str).to_numpy()
+                        acc_vals.append((t == p).mean())
+
+                    rows.append({
+                        "rate": rate, "mechanism": mech, "dataset": name, "method": method,
+                        "nrmse":        np.mean(nrmse_vals) if nrmse_vals else np.nan,
+                        "cat_accuracy": np.mean(acc_vals)   if acc_vals   else np.nan,
+                    })
+
+    return pd.DataFrame(rows)
