@@ -8,8 +8,9 @@ import pandas as pd
 from sklearn.impute import SimpleImputer, KNNImputer
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
+from missforest import MissForest
+from lightgbm import LGBMClassifier, LGBMRegressor
 from analysis.tests import split_columns
 from config import KNN_K, MICE_ITER, RF_TREES, SEED
 
@@ -100,22 +101,42 @@ def mice_impute(df, max_iter=MICE_ITER):
     df_imputed = _decode_categoricals(df_imputed, cat_cols, encoders)
     return df_imputed
 
-# MissForest imputation using IterativeImputer with RandomForestRegressor.
+# MissForest imputation using the dedicated MissForest package
+# (https://pypi.org/project/MissForest/). Categorical columns are label-encoded
+# to integer codes and named via `categorical=`, so the package fits a
+# classifier (LGBMClassifier) on them and a regressor (LGBMRegressor) on the
+# numeric columns — a genuine mixed MissForest model rather than regression with
+# rounding. RF_TREES maps to each learner's number of trees (n_estimators) and
+# MICE_ITER to the number of imputation iterations (max_iter).
 def missforest_impute(df, n_estimators=RF_TREES, max_iter=MICE_ITER):
     df_imputed         = df.copy()
     num_cols, cat_cols = split_columns(df)
 
+    # The package needs numeric input and identifies categorical targets by name,
+    # so encode categoricals to integer codes (NaNs preserved) first.
     df_imputed, encoders = _encode_categoricals(df_imputed, cat_cols)
 
-    imputer    = IterativeImputer(
-        estimator=RandomForestRegressor(n_estimators=n_estimators, random_state=SEED),
+    # LightGBM rejects feature names containing special JSON characters (which
+    # the clinical column names contain), so temporarily rename columns to safe
+    # placeholders and restore the originals afterwards.
+    safe_names = {col: f"f{i}" for i, col in enumerate(df_imputed.columns)}
+    orig_names = {v: k for k, v in safe_names.items()}
+    df_imputed = df_imputed.rename(columns=safe_names)
+    cat_safe   = [safe_names[c] for c in cat_cols]
+
+    imputer = MissForest(
+        clf=LGBMClassifier(n_estimators=n_estimators, random_state=SEED, verbosity=-1),
+        rgr=LGBMRegressor(n_estimators=n_estimators, random_state=SEED, verbosity=-1),
+        categorical=cat_safe if cat_safe else None,
         max_iter=max_iter,
-        random_state=SEED
+        verbose=0,
     )
-    df_imputed = pd.DataFrame(
-        imputer.fit_transform(df_imputed),
-        columns=df_imputed.columns
-    )
+    df_imputed = imputer.fit_transform(df_imputed)
+    df_imputed = df_imputed.rename(columns=orig_names)
+
+    # The package reorders columns internally; restore the original row and
+    # column order so downstream alignment stays correct.
+    df_imputed = df_imputed.reindex(index=df.index, columns=df.columns)
 
     for col in num_cols:
         df_imputed[col] = pd.to_numeric(df_imputed[col], errors="coerce")

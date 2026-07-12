@@ -6,3 +6,6 @@ matplotlib
 seaborn
 scikit-posthocs
 missmecha
+MissForest
+lightgbm
+tqdm

@@ -4,11 +4,11 @@
 # Change settings in config.py — don't edit here.
 # ============================================================
 
-import pickle
 import os
+import glob
 import pandas as pd
 
-from config import SELECTED_DATASETS, MISSING_RATES, RESULTS_DIR
+from config import SELECTED_DATASETS, MISSING_RATES, PLOTS_DIR
 from data.loading import load_data
 from preprocessing.cleaning import clean_datasets
 from preprocessing.coercion import coerce_types
@@ -26,8 +26,6 @@ from visualization.plots import (
     plot_degradation_line,
     plot_recovery_bar
 )
-
-os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
 def run_pipeline_for_rate(dfs_cleaned, missing_rate):
@@ -91,11 +89,6 @@ def main():
             "all_stats":        all_stats
         }
 
-    # save to disk so you don't have to rerun
-    with open(f"{RESULTS_DIR}/all_rates_results.pkl", "wb") as f:
-        pickle.dump(all_rates_results, f)
-    print(f"\nResults saved to {RESULTS_DIR}/all_rates_results.pkl")
-
     # ── 4. Evaluation for primary rate (0.1) ─────────────────
     print("\n[4] Running evaluation for primary rate (0.1)...")
     primary          = all_rates_results[0.1]
@@ -108,7 +101,13 @@ def main():
     summary_df  = build_summary_df(differences)
 
     # ── 5. Plots ─────────────────────────────────────────────
-    print("\n[7] Generating plots...")
+    print("\n[5] Generating plots...")
+
+    # Start from a clean plots folder so each run overwrites the previous
+    # figures and stale plots don't accumulate across runs.
+    os.makedirs(PLOTS_DIR, exist_ok=True)
+    for old_plot in glob.glob(os.path.join(PLOTS_DIR, "*.png")):
+        os.remove(old_plot)
 
     # all_rates_stats spans every missing rate — used by the aggregated rank
     # plot and the degradation line plots.
