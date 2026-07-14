@@ -1,9 +1,3 @@
-# ============================================================
-# main.py
-# Runs the full MISS project pipeline end to end.
-# Change settings in config.py — don't edit here.
-# ============================================================
-
 import os
 import glob
 import pandas as pd
@@ -27,9 +21,8 @@ from visualization.plots import (
     plot_recovery_bar
 )
 
-
+#Runs full simulation + imputation + stats pipeline for one missing rate.
 def run_pipeline_for_rate(dfs_cleaned, missing_rate):
-    """Run full simulation + imputation + stats pipeline for one missing rate."""
     print(f"\n{'='*60}")
     print(f"Running pipeline for missing_rate = {missing_rate}")
     print(f"{'='*60}")
@@ -62,14 +55,14 @@ def run_pipeline_for_rate(dfs_cleaned, missing_rate):
 
 def main():
 
-    # ── 1. Load and clean data ───────────────────────────────
-    print("\n[1] Loading and cleaning data...")
+    # 1. Load and clean data 
+    print("\ni. Loading and cleaning data.")
     dfs         = load_data()
     dfs_cleaned = clean_datasets(dfs)
     dfs_cleaned = coerce_types(dfs_cleaned)
 
-    # ── 2. Ground truth stats ────────────────────────────────
-    print("\n[2] Computing ground truth statistics...")
+    # 2. Ground truth stats 
+    print("\nii. Computing ground truth statistics.")
     ground_truth_stats = {}
     for name in SELECTED_DATASETS:
         if name not in dfs_cleaned:
@@ -77,8 +70,8 @@ def main():
         ground_truth_stats[name] = compute_stats(dfs_cleaned[name])
         print(f"  {name} done")
 
-    # ── 3. Run pipeline for all missing rates ────────────────
-    print("\n[3] Running pipeline for all missing rates...")
+    # 3. Run pipeline for all missing rates 
+    print("\niii. Running pipeline for all missing rates.")
     all_rates_results = {}
 
     for rate in MISSING_RATES:
@@ -89,8 +82,8 @@ def main():
             "all_stats":        all_stats
         }
 
-    # ── 4. Evaluation for primary rate (0.1) ─────────────────
-    print("\n[4] Running evaluation for primary rate (0.1)...")
+    # 4. Evaluation for primary rate (0.1)
+    print("\niv. Running evaluation for primary rate (0.1).")
     primary          = all_rates_results[0.1]
     mechanisms       = primary["mechanisms"]
     imputed_datasets = primary["imputed_datasets"]
@@ -100,8 +93,8 @@ def main():
     differences = compute_all_differences(all_stats, ground_truth_stats)
     summary_df  = build_summary_df(differences)
 
-    # ── 5. Plots ─────────────────────────────────────────────
-    print("\n[5] Generating plots...")
+    # 5. Plots
+    print("\nv. Generating plots.")
 
     # Start from a clean plots folder so each run overwrites the previous
     # figures and stale plots don't accumulate across runs.

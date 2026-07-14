@@ -4,6 +4,9 @@ from config import SELECTED_DATASETS, SEED
 
 #Simulate Missing Completely At Random.
 #fit_transform looks at clean dataframe to plan where missingness should go 
+#cats_col: because MissMechaGenerator can't tell which columns are categorical on its own 
+#needs you to be told that list is different for every dataset, 
+#so it has to be recomputed inside the loop for each one.
 def simulate_mcar(dfs_cleaned, missing_rate, seed=SEED):
     datasets = {}
     for name in SELECTED_DATASETS:
@@ -14,6 +17,7 @@ def simulate_mcar(dfs_cleaned, missing_rate, seed=SEED):
         cat_cols = df.select_dtypes(include="object").columns.tolist()
         mm       = MissMechaGenerator(
             mechanism="MCAR", mechanism_type=1,
+            # MissMecha's API requires categorical columns to be declared rather than sniffing dtypes itself
             missing_rate=missing_rate, seed=seed, cat_cols=cat_cols
         )
         datasets[name] = mm.fit_transform(df)

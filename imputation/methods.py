@@ -43,7 +43,8 @@ def _encode_categoricals(df_imputed, cat_cols):
         # so the same mapping can be reversed later 
         encoders[col]       = le
         df_imputed[col]     = df_imputed[col].map(
-            lambda x: le.transform([x])[0] if pd.notna(x) else np.nan #Rewrites the column: each real label becomes its integer code, and each NaN stays NaN
+        #Rewrites the column: each real label becomes its integer code, and each NaN stays NaN
+            lambda x: le.transform([x])[0] if pd.notna(x) else np.nan 
         )
     return df_imputed, encoders
 
@@ -102,11 +103,10 @@ def mice_impute(df, max_iter=MICE_ITER):
     return df_imputed
 
 # MissForest imputation using the dedicated MissForest package
-# (https://pypi.org/project/MissForest/). Categorical columns are label-encoded
-# to integer codes and named via `categorical=`, so the package fits a
-# classifier (LGBMClassifier) on them and a regressor (LGBMRegressor) on the
-# numeric columns — a genuine mixed MissForest model rather than regression with
-# rounding. RF_TREES maps to each learner's number of trees (n_estimators) and
+# Categorical columns are label-encoded to integer codes and named via `categorical=`
+# so the package fits a classifier (LGBMClassifier) on them and a regressor (LGBMRegressor) on the
+# numeric columns: a genuine mixed MissForest model rather than regression with rounding. 
+# RF_TREES maps to each learner's number of trees (n_estimators) and
 # MICE_ITER to the number of imputation iterations (max_iter).
 def missforest_impute(df, n_estimators=RF_TREES, max_iter=MICE_ITER):
     df_imputed         = df.copy()
@@ -119,18 +119,35 @@ def missforest_impute(df, n_estimators=RF_TREES, max_iter=MICE_ITER):
     # LightGBM rejects feature names containing special JSON characters (which
     # the clinical column names contain), so temporarily rename columns to safe
     # placeholders and restore the originals afterwards.
+
+    #enumerate is a built-in Python function that, when you loop over a collection, 
+    #gives you both a running counter and each item
+
+    #Build the safe-name map
+    #e.g:- {"Diagnosis Age": "f0", "Tumor Stage": "f1"}
     safe_names = {col: f"f{i}" for i, col in enumerate(df_imputed.columns)}
-    orig_names = {v: k for k, v in safe_names.items()}
+
+    #Build the reverse map so we can restore the original names later
+    #e.g:- {"f0": "Diagnosis Age", "f1": "Tumor Stage"}
+    orig_names = {v: k for k, v in safe_names.items()} 
+
+    #Rename the columns to safe names for LightGBM
+    # (f0, f1, …)
     df_imputed = df_imputed.rename(columns=safe_names)
+    #Translate the categorical list
+    #["Tumor Stage", "Grade"] to ["f1", "f5"]
     cat_safe   = [safe_names[c] for c in cat_cols]
 
     imputer = MissForest(
-        clf=LGBMClassifier(n_estimators=n_estimators, random_state=SEED, verbosity=-1),
+        # the model used for categorical columns
+        clf=LGBMClassifier(n_estimators=n_estimators, random_state=SEED, verbosity=-1), #verbosity=-1 to silence LightGBM's logging
+        # the model for numeric columns 
         rgr=LGBMRegressor(n_estimators=n_estimators, random_state=SEED, verbosity=-1),
         categorical=cat_safe if cat_safe else None,
         max_iter=max_iter,
         verbose=0,
     )
+    #learns from the observed values and returns a new DataFrame with every missing cell filled.
     df_imputed = imputer.fit_transform(df_imputed)
     df_imputed = df_imputed.rename(columns=orig_names)
 

@@ -12,7 +12,6 @@ venv/
 .venv/
 
 # Project-specific
-results/*.pkl
 results/*.csv
 data/data_file/
 

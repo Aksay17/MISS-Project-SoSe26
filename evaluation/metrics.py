@@ -1,8 +1,3 @@
-# ============================================================
-# evaluation/metrics.py
-# All evaluation metrics: abs diff, NRMSE, F1
-# ============================================================
-
 import numpy as np
 import pandas as pd
 
@@ -82,13 +77,16 @@ def build_summary_df(differences):
 def compute_recovery_accuracy(all_rates_results, dfs_cleaned):
     from analysis.tests import split_columns
 
-    SKIP = {"complete_case"}   # does not impute cell values
+    SKIP = {"complete_case"}   # does not impute cell values, pairwise is not in the imputed ds 
     rows = []
 
+    #Loop over each missingness rate (0.1, 0.2, 0.3). For that rate, 
+    #pull out the missingness datasets (mechanisms) and the imputed datasets 
     for rate, result in all_rates_results.items():
         mechanisms       = result["mechanisms"]
         imputed_datasets = result["imputed_datasets"]
 
+        #Loop over each imputation method; skip complete_case entirely.
         for method, mech_data in imputed_datasets.items():
             if method in SKIP:
                 continue
@@ -97,31 +95,42 @@ def compute_recovery_accuracy(all_rates_results, dfs_cleaned):
                     if name not in dfs_cleaned:
                         continue
 
-                    # Imputers rebuild the frame with a fresh index, so align by
-                    # ROW POSITION (reset_index), never by index label.
+                    # Imputers rebuild the frame with a fresh index, 
+                    # aligning by row position (not by the old index labels) 
+                    # is what keeps the same physical row lined up across all three.
                     truth   = dfs_cleaned[name].reset_index(drop=True)
                     missing = mechanisms[mech][name].reset_index(drop=True)
                     imputed = imp.reset_index(drop=True)
+                    #Determine which columns are numeric and which are categorical, based on the ground truth.
                     num_cols, cat_cols = split_columns(truth)
 
-                    # ---- numeric: NRMSE per column, then average ----
+                    # Prepare a list of per-column NRMSE values, 
+                    # and loop over numeric columns; skip any that aren't in the imputed frame.
                     nrmse_vals = []
                     for col in num_cols:
                         if col not in imputed.columns:
                             continue
+                        #cells that were deleted in this column. 
+                        #If nothing was masked here, there's nothing to score; skip.
                         mask = missing[col].isna()
                         if mask.sum() == 0:
                             continue
                         true_v = pd.to_numeric(truth.loc[mask, col],   errors="coerce").to_numpy(float)
                         pred_v = pd.to_numeric(imputed.loc[mask, col], errors="coerce").to_numpy(float)
                         col_range = truth[col].max() - truth[col].min()
+
+                        #Compute the column's range (max − min) to use as the normalizer. 
+                        #If the range is valid, use it; if it's zero or NaN, 
+                        #fall back to the standard deviation. 
+                        #If even that is zero/NaN, skip the column (can't normalize).
                         denom = col_range if (col_range and not np.isnan(col_range)) else truth[col].std()
                         if not denom or np.isnan(denom):
                             continue
+                        #square the errors, average them, square-root
                         rmse = np.sqrt(np.nanmean((pred_v - true_v) ** 2))
                         nrmse_vals.append(rmse / denom)
 
-                    # ---- categorical: accuracy per column, then average ----
+                    # categorical: accuracy per column, then average 
                     acc_vals = []
                     for col in cat_cols:
                         if col not in imputed.columns:

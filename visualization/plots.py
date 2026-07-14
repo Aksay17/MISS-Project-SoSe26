@@ -1,20 +1,14 @@
-# ============================================================
-# visualization/plots.py
-# All plotting functions.
-# ============================================================
-
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from evaluation.metrics import compute_stat_differences
 from config import PLOTS_DIR
 
 
-# ── Heatmaps ─────────────────────────────────────────────────
-
+# Mean absolute difference heatmap — rows=datasets, cols=methods.
 def plot_heatmap(stat_type, value_col, summary_df):
-    """Mean absolute difference heatmap — rows=datasets, cols=methods."""
     df = summary_df[summary_df["stat_type"] == stat_type].copy()
 
     if df.empty:
@@ -53,20 +47,17 @@ def plot_heatmap(stat_type, value_col, summary_df):
                     dpi=150, bbox_inches="tight")
         plt.show()
 
-# ── Rank plot ────────────────────────────────────────────────
 
+#Aggregated average-rank plot, pooled across ALL missingness rates
+
+ 
+# Within every (rate, mechanism, dataset) situation the methods are ranked by
+# their mean absolute difference from ground truth (rank 1 = closest = best),
+# and each method's ranks are then averaged. The 'Overall' panel averages over
+# all rates, mechanisms and datasets; each mechanism panel averages over all
+# rates and datasets for that mechanism.
+    
 def plot_rank(stat_type, all_rates_stats, ground_truth_stats):
-    """
-    Aggregated average-rank plot, pooled across ALL missingness rates.
-
-    Within every (rate, mechanism, dataset) situation the methods are ranked by
-    their mean absolute difference from ground truth (rank 1 = closest = best),
-    and each method's ranks are then averaged. The 'Overall' panel averages over
-    all rates, mechanisms and datasets; each mechanism panel averages over all
-    rates and datasets for that mechanism.
-    """
-    from evaluation.metrics import compute_stat_differences
-
     value_col = (
         "correlation" if stat_type == "pearson" else
         "f_stat"      if stat_type == "anova"   else
@@ -146,26 +137,13 @@ def plot_rank(stat_type, all_rates_stats, ground_truth_stats):
     plt.show()
 
 
-# ── Line plot for missingness rate degradation ───────────────
+# Line plot for missingness rate degradation 
+# Line plot showing performance degradation across missingness rates.
+# x = missing rate, y = mean absolute difference, one line per method.
+
 
 def plot_degradation_line(stat_type, all_rates_stats, ground_truth_stats,
                           min_coverage=30):
-    """
-    Line plot showing performance degradation across missingness rates.
-    x = missing rate, y = mean absolute difference, one line per method.
-
-    Coverage guard
-    --------------
-    Each plotted point is the mean of N per-pair differences. Under heavy
-    missingness, complete-case deletion can leave so few rows that only a
-    handful of tests survive (and on different datasets at each rate), making
-    the point unstable and not comparable across x. Any point backed by fewer
-    than `min_coverage` valid tests is set to NaN so it drops out of the line
-    instead of being plotted as a misleading value. Set min_coverage=0 to
-    disable the guard.
-    """
-    from evaluation.metrics import compute_stat_differences
-
     value_col = (
         "correlation" if stat_type == "pearson" else
         "f_stat"      if stat_type == "anova"   else
@@ -215,108 +193,15 @@ def plot_degradation_line(stat_type, all_rates_stats, ground_truth_stats,
     plt.show()
 
 
-# ── Cell-level imputation recovery plots ─────────────────────
-
-def plot_recovery_heatmap(accuracy_df, metric, rate=None):
-    """
-    Cell-level recovery heatmap (rows = datasets, cols = methods), one per
-    mechanism, at a single missing rate (default = the lowest rate present).
-        metric="nrmse"        -> lower = better  (red colormap)
-        metric="cat_accuracy" -> higher = better (green colormap, fixed 0..1)
-    """
-    if accuracy_df.empty:
-        print("No recovery data")
-        return
-    if rate is None:
-        rate = min(accuracy_df["rate"].unique())
-
-    df = accuracy_df[accuracy_df["rate"] == rate]
-    if metric == "nrmse":
-        cmap, label, vmin, vmax = "YlOrRd", "NRMSE (lower = better)", None, None
-    else:
-        cmap, label, vmin, vmax = "YlGn", "Categorical Accuracy (higher = better)", 0.0, 1.0
-
-    for mech in ["MCAR", "MAR", "MNAR"]:
-        mech_df = df[df["mechanism"] == mech].pivot(
-            index="dataset", columns="method", values=metric
-        )
-        if mech_df.empty:
-            continue
-
-        plt.figure(figsize=(12, 6))
-        ax = sns.heatmap(mech_df, annot=True, fmt=".3f", cmap=cmap,
-                         vmin=vmin, vmax=vmax, linewidths=0.5,
-                         cbar_kws={"label": label})
-        ax.set_facecolor("#eeeeee")
-        for yi in range(mech_df.shape[0]):
-            for xi in range(mech_df.shape[1]):
-                if pd.isna(mech_df.iloc[yi, xi]):
-                    ax.text(xi + 0.5, yi + 0.5, "N/A", ha="center", va="center",
-                            fontsize=11, color="grey", fontweight="bold")
-
-        plt.title(f"Imputation Recovery ({metric}) - {mech} @ {int(rate*100)}% missing",
-                  fontsize=14, fontweight="bold")
-        plt.xlabel("Imputation Method", fontsize=12)
-        plt.ylabel("Cancer Dataset", fontsize=12)
-        plt.xticks(rotation=45, ha="right")
-        plt.yticks(rotation=0)
-        plt.tight_layout()
-        os.makedirs(PLOTS_DIR, exist_ok=True)
-        plt.savefig(os.path.join(PLOTS_DIR, f"heatmap_recovery_{metric}_{mech}.png"),
-                    dpi=150, bbox_inches="tight")
-        plt.show()
-
-
-def plot_recovery_degradation(accuracy_df, metric):
-    """
-    Cell-level recovery vs missing rate, one line per method, per-mechanism panels.
-        metric="nrmse"        -> expect lines to rise (recovery worsens)
-        metric="cat_accuracy" -> expect lines to fall
-    """
-    if accuracy_df.empty:
-        print("No recovery data")
-        return
-
-    rates   = sorted(accuracy_df["rate"].unique())
-    methods = list(accuracy_df["method"].unique())
-    colors  = {"mean_mode": "#4C72B0", "knn": "#DD8452",
-               "mice": "#55A868", "missforest": "#C44E52"}
-    ylabel  = ("NRMSE (lower = better)" if metric == "nrmse"
-               else "Categorical Accuracy (higher = better)")
-
-    fig, axes = plt.subplots(1, 3, figsize=(24, 7))
-    for ax, mech in zip(axes, ["MCAR", "MAR", "MNAR"]):
-        sub = accuracy_df[accuracy_df["mechanism"] == mech]
-        for method in methods:
-            g = sub[sub["method"] == method].groupby("rate")[metric].mean().reindex(rates)
-            ax.plot([r * 100 for r in rates], g.values, marker="o", label=method,
-                    color=colors.get(method, "gray"), linewidth=2, markersize=7)
-        ax.set_title(mech, fontsize=16, fontweight="bold")
-        ax.set_xlabel("Missing Rate (%)", fontsize=13)
-        ax.set_ylabel(ylabel, fontsize=13)
-        ax.set_xticks([r * 100 for r in rates])
-        if metric == "cat_accuracy":
-            ax.set_ylim(-0.02, 1.02)
-        ax.legend(title="Method", fontsize=11)
-        ax.grid(linestyle="--", alpha=0.5)
-
-    fig.suptitle(f"Imputation Value Recovery ({metric}) by Missingness Rate",
-                 fontsize=20, fontweight="bold")
-    plt.tight_layout()
-    os.makedirs(PLOTS_DIR, exist_ok=True)
-    plt.savefig(os.path.join(PLOTS_DIR, f"degradation_recovery_{metric}.png"),
-                dpi=150, bbox_inches="tight")
-    plt.show()
-
+# Cell-level imputation recovery plots: bar plot 
+# Grouped bar chart of cell-level recovery across ALL missing rates.
+# One panel per mechanism (MCAR/MAR/MNAR); within each panel x = imputation
+# method and bars are grouped by missing rate. y = mean metric across datasets.
+# metric="nrmse"  lower = better
+# metric="cat_accuracy" higher = better (y fixed 0..1)
 
 def plot_recovery_bar(accuracy_df, metric):
-    """
-    Grouped bar chart of cell-level recovery across ALL missing rates.
-    One panel per mechanism (MCAR/MAR/MNAR); within each panel x = imputation
-    method and bars are grouped by missing rate. y = mean metric across datasets.
-        metric="nrmse"        -> lower = better
-        metric="cat_accuracy" -> higher = better (y fixed 0..1)
-    """
+   
     if accuracy_df.empty:
         print("No recovery data")
         return
