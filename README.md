@@ -21,11 +21,11 @@ and the results are compared against the known ground truth at two levels:
 
 The experiment is a full factorial over four axes:
 
-- **4 datasets** — Invasive Breast Carcinoma, Non-Small Cell Lung Cancer,
+- **4 datasets**: Invasive Breast Carcinoma, Non-Small Cell Lung Cancer,
   Well-Differentiated Thyroid Cancer, Endometrial Carcinoma.
-- **3 missingness mechanisms** — MCAR, MAR, MNAR.
-- **3 missingness rates** — 10%, 20%, 30%.
-- **6 methods** — complete-case deletion, mean/mode, KNN, MICE, MissForest,
+- **3 missingness mechanisms**: MCAR, MAR, MNAR.
+- **3 missingness rates**: 10%, 20%, 30%.
+- **6 methods**: complete-case deletion, mean/mode, KNN, MICE, MissForest,
   and pairwise (available-case) analysis.
 
 
@@ -34,7 +34,7 @@ The experiment is a full factorial over four axes:
 The pipeline (`main.py`) runs end to end:
 
 1. **Load** the clinical data and split it by cancer type (`data/loading.py`).
-2. **Clean** each dataset — drop empty/constant/ID-like columns and greedily
+2. **Clean** each dataset; drop empty/constant/ID-like columns and greedily
    reduce columns so that a usable fraction of fully complete rows remains
    (`preprocessing/cleaning.py`).
 3. **Coerce** column types (numeric vs. categorical) so the right tests and
@@ -42,9 +42,9 @@ The pipeline (`main.py`) runs end to end:
 4. **Simulate** missingness under MCAR/MAR/MNAR at each rate
    (`missingness/simulation.py`).
 5. **Impute** with every method (`imputation/methods.py`).
-6. **Analyse** — compute Pearson correlation, one-way ANOVA, and chi-square
+6. **Analyse** compute Pearson correlation, one-way ANOVA, and chi-square
    statistics on each dataset (`analysis/tests.py`).
-7. **Evaluate** — measure each method's deviation from ground truth, rank the
+7. **Evaluate** measure each method's deviation from ground truth, rank the
    methods, and compute cell-level recovery accuracy (`evaluation/metrics.py`).
 8. **Plot** the results (`visualization/plots.py`).
 
@@ -126,28 +126,28 @@ All settings live in `config.py`:
 Running the pipeline produces the following figures in `plots/` (each overwritten
 on every run):
 
-- `heatmap_{pearson,anova,chi2}_{MCAR,MAR,MNAR}.png` — absolution mean deviation on each dataset and method, one heatmap per statistic and mechanism (plotted for 10% missingness).
-- `rank_{pearson,anova,chi2}.png` — method rankings aggregated across all
+- `heatmap_{pearson,anova,chi2}_{MCAR,MAR,MNAR}.png`: absolution mean deviation on each dataset and method, one heatmap per statistic and mechanism (plotted for 10% missingness).
+- `rank_{pearson,anova,chi2}.png`: method rankings aggregated across all
   missingness rates, mechanisms, and datasets.
-- `degradation_{pearson,anova,chi2}.png` — how deviation grows with the
+- `degradation_{pearson,anova,chi2}.png`: how deviation grows with the
   missingness rate, one line per method.
-- `recovery_bar_nrmse.png` — numeric value-recovery error (NRMSE; lower is
+- `recovery_bar_nrmse.png`: numeric value-recovery error (NRMSE; lower is
   better), grouped bar by rate, one panel per mechanism.
-- `recovery_bar_cat_accuracy.png` — categorical value-recovery accuracy (higher
+- `recovery_bar_cat_accuracy.png`: categorical value-recovery accuracy (higher
   is better), same layout.
 
 ## Evaluation metrics
 
-- **Statistic difference** — absolute difference between a statistic (Pearson
+- **Statistic difference**: absolute difference between a statistic (Pearson
   correlation, ANOVA F, chi-square) computed on the imputed data and on the
   ground truth.
-- **Aggregated ranking** — within each (rate, mechanism, dataset) situation the
+- **Aggregated ranking**: within each (rate, mechanism, dataset) situation the
   methods are ranked by their statistic difference, and the ranks are then
   averaged across all situations.
-- **NRMSE** — root-mean-square error of the imputed numeric values at the masked
+- **NRMSE**: root-mean-square error of the imputed numeric values at the masked
   cells, normalised by each column's ground-truth range, then averaged across
   numeric columns. Lower is better.
-- **Categorical accuracy** — fraction of masked categorical cells recovered with
+- **Categorical accuracy**: fraction of masked categorical cells recovered with
   the exact correct label, averaged per column and then across columns. Higher
   is better.
 
