@@ -86,10 +86,9 @@ pip install -r requirements.txt
 ## Data setup
 
 The datasets are derived from publicly available clinical cancer data obtained
-from [cBioPortal](https://www.cbioportal.org/). 
+from [TCGAclinical](https://github.com/GerkeLab/TCGAclinical). 
 
-1. Obtain the source TSV file. *(Add here the exact cBioPortal study/download
-   you used, so others can reproduce the same data.)*
+1. Obtain the source TSV file. *(cBioportal_data.tsv)*
 2. Place it under `data/data_file/`.
 3. Point `DATA_PATH` in `config.py` to that file.
 
@@ -127,8 +126,7 @@ All settings live in `config.py`:
 Running the pipeline produces the following figures in `plots/` (each overwritten
 on every run):
 
-- `heatmap_{pearson,anova,chi2}_{MCAR,MAR,MNAR}.png` — mean deviation from ground
-  truth per dataset and method, one heatmap per statistic and mechanism.
+- `heatmap_{pearson,anova,chi2}_{MCAR,MAR,MNAR}.png` — absolution mean deviation on each dataset and method, one heatmap per statistic and mechanism (plotted for 10% missingness).
 - `rank_{pearson,anova,chi2}.png` — method rankings aggregated across all
   missingness rates, mechanisms, and datasets.
 - `degradation_{pearson,anova,chi2}.png` — how deviation grows with the
