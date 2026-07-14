@@ -1,4 +1,4 @@
-# MISS Project:  Missing-Data Imputation Methods on Clinical Cancer Data
+# Benchmarking Missing-Data Imputation Methods on Clinical Cancer Data
 
 A pipeline that evaluates how well different imputation methods cope
 with missing values in clinical cancer datasets. For each dataset, missingness is
