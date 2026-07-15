@@ -13,6 +13,8 @@ from missforest import MissForest
 from lightgbm import LGBMClassifier, LGBMRegressor
 from analysis.tests import split_columns
 from config import KNN_K, MICE_ITER, RF_TREES, SEED
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+
 
 #Remove all rows with any missing values.
 def impute_complete_case(df):
@@ -140,9 +142,9 @@ def missforest_impute(df, n_estimators=RF_TREES, max_iter=MICE_ITER):
 
     imputer = MissForest(
         # the model used for categorical columns
-        clf=LGBMClassifier(n_estimators=n_estimators, random_state=SEED, verbosity=-1), #verbosity=-1 to silence LightGBM's logging
+        clf=RandomForestClassifier(n_estimators=n_estimators, random_state=SEED), #verbosity=-1 to silence LightGBM's logging
         # the model for numeric columns 
-        rgr=LGBMRegressor(n_estimators=n_estimators, random_state=SEED, verbosity=-1),
+        rgr=RandomForestRegressor(n_estimators=n_estimators, random_state=SEED),
         categorical=cat_safe if cat_safe else None,
         max_iter=max_iter,
         verbose=0,
