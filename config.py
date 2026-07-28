@@ -1,6 +1,6 @@
 # Dataset path, used to access data file in the data folder. 
 # used in data/loading.py and regenerate_plots.py
-DATA_PATH = r"C:\Users\PC\Documents\GitHub\miss_project\data\data_file\cBioportal_data.tsv"
+DATA_PATH = r"ADD LOCAL DATA PATH HERE"
 
 # selected list of datasets to be used in the analysis 
 # used in missingness/simulation.py, preprocessing/cleaning.py, preprocessing/coercion.py
